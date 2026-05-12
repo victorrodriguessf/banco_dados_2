@@ -47,5 +47,36 @@ order by
 	mes;
 
 -- ==============================================
--- TICKET MÉDIO
+-- 10 tipos de serviços mais executados
 -- ==============================================
+
+select
+	ts.descricao,
+	count(*) as qtd,
+	SUM(ise.valor_mao_de_obra) as valor
+from
+	oficina.item_servico ise
+	join oficina.tipo_servico ts on ise.id_tipo_servico = ts.id
+group by 
+	ts.descricao
+order by 
+	qtd desc,
+	ts.descricao ASC
+limit 10
+
+-- ==============================================
+-- Funcionários que mais atendem
+-- ==============================================
+
+select
+	oficina.funcionario.nome_completo,
+	SUM(ise.valor_mao_de_obra) as valor
+from
+	oficina.item_servico ise
+	join oficina.funcionario fun on fun.id = ise.id_funcionario 
+group by 
+	oficina.funcionario.nome_completo
+order by 
+	qtd desc,
+	ts.descricao ASC
+limit 10
