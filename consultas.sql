@@ -1,5 +1,5 @@
 -- ==============================================
--- VERIFICAÇÃO DOS VOLUMES
+-- 01 - VERIFICAÇÃO DOS VOLUMES
 -- ==============================================
 
 SELECT 'cliente' AS tabela, COUNT(*) AS total FROM oficina.cliente
@@ -27,7 +27,7 @@ UNION ALL
 SELECT 'avaliacao', COUNT(*) FROM oficina.avaliacao;
 
 -- ==============================================
--- TICKET MÉDIO
+-- 02 - TICKET MÉDIO
 -- ==============================================
 
 select
@@ -47,7 +47,7 @@ order by
 	mes;
 
 -- ==============================================
--- 10 tipos de serviços mais executados
+-- 03 - 10 tipos de serviços mais executados
 -- ==============================================
 
 select
@@ -65,18 +65,24 @@ order by
 limit 10
 
 -- ==============================================
--- Funcionários que mais atendem
+-- 04 - Funcionários que mais atendem
 -- ==============================================
 
 select
-	oficina.funcionario.nome_completo,
+	fun.nome_completo,
+	fun.matricula,
+	count(*) as qtd,
 	SUM(ise.valor_mao_de_obra) as valor
 from
 	oficina.item_servico ise
-	join oficina.funcionario fun on fun.id = ise.id_funcionario 
+	join oficina.funcionario fun on fun.id = ise.id_funcionario
 group by 
-	oficina.funcionario.nome_completo
+	fun.nome_completo,
+	fun.matricula
 order by 
-	qtd desc,
-	ts.descricao ASC
+	valor desc
 limit 10
+
+-- ==============================================
+--  05 - 20 clientes com maior gasto acumulado
+-- ==============================================
