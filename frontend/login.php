@@ -46,20 +46,51 @@ function realizarLogin($pdo)
 
     if ($resultado) {
 
-        // Verifica o perfil
-        if ($resultado["perfil"] == "funcionario") {
+        // Gera token seguro
+        $token = bin2hex(random_bytes(32));
 
+        // Salva sessão no banco
+        $sqlSessao = "
+            INSERT INTO oficina.sessao
+            (
+                usuario_id,
+                token
+            )
+            VALUES
+            (
+                :usuario_id,
+                :token
+            )
+        ";
+
+        $stmtSessao = $pdo->prepare($sqlSessao);
+
+        $stmtSessao->execute([
+            ":usuario_id" => $resultado["id"],
+            ":token" => $token
+        ]);
+
+        // Salva token em cookie
+        setcookie(
+            "auth_token",
+            $token,
+            [
+                "expires" => time() + (60 * 60 * 24 * 7), // 7 dias
+                "path" => "/",
+                "httponly" => true,
+                "secure" => true,
+                "samesite" => "Strict"
+            ]
+        );
+
+        if ($resultado["perfil"] == "funcionario") {
             header("Location: homeFuncionario.php");
             exit();
-        } else{
+        } else {
             header("Location: homeCliente.php");
             exit();
         }
-
-        return "Login realizado com sucesso!";
-
     } else {
-
         return "Credenciais inválidas!";
     }
 }
