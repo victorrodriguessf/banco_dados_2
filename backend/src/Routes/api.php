@@ -10,6 +10,11 @@ if ($method === 'POST' && $uri === '/auth/login') {
     exit();
 }
 
-// Rota não encontrada
+if ($method === 'POST' && $uri === '/auth/refresh') {
+    (new AuthController())->refresh();
+    exit();
+}
+
+header('Content-Type: application/json; charset=utf-8');
 http_response_code(404);
-echo json_encode(['erro' => 'Rota não encontrada.']);
+echo json_encode(['erro' => 'Rota nao encontrada.']);

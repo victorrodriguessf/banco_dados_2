@@ -39,4 +39,34 @@ class UsuarioModel
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute([':usuario_id' => $usuarioId, ':token' => $token]);
     }
+
+    public function buscarPorRefreshToken(string $token): array|false
+    {
+        $sql = "
+            SELECT u.*
+            FROM oficina.sessao s
+            INNER JOIN oficina.usuario u ON u.id = s.usuario_id
+            WHERE s.token = :token
+        ";
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([':token' => $token]);
+
+        return $stmt->fetch(PDO::FETCH_ASSOC);
+    }
+
+    public function atualizarRefreshToken(string $tokenAtual, string $novoToken): void
+    {
+        $sql = "
+            UPDATE oficina.sessao
+            SET token = :novo_token
+            WHERE token = :token_atual
+        ";
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([
+            ':novo_token' => $novoToken,
+            ':token_atual' => $tokenAtual,
+        ]);
+    }
 }
