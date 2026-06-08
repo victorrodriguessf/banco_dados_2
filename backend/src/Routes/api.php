@@ -27,12 +27,12 @@ if ($method === 'POST' && $uri === '/auth/refresh') {
     exit();
 }
 
-if ($method === 'POST' && $uri === '/clientes') {
+if ($method === 'POST' && preg_match('#^/clientes/?$#', $uri)) {
     (new ClienteController())->criar();
     exit();
 }
 
-if ($method === 'GET' && preg_match('#^/(?:api/)?clientes$#', $uri)) {
+if ($method === 'GET' && preg_match('#^/(?:api/)?clientes/?$#', $uri)) {
     (new ClienteController())->listar();
     exit();
 }
