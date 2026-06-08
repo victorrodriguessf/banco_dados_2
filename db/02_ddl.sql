@@ -73,6 +73,7 @@ CREATE TABLE oficina.ordem_servico (
     id_cliente       INTEGER NOT NULL REFERENCES oficina.cliente(id),
     hodometro_inicial NUMERIC NOT NULL,
     hodometro_final   NUMERIC NOT NULL,
+    status           TEXT NOT NULL DEFAULT 'aberta',
     id_agendamento   INTEGER NOT NULL REFERENCES oficina.agendamento(id)
 );
 

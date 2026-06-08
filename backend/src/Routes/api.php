@@ -1,6 +1,7 @@
 <?php
 
 use App\Controllers\AuthController;
+use App\Controllers\AgendamentoController;
 use App\Controllers\ClienteController;
 use App\Controllers\VeiculoController;
 
@@ -14,6 +15,21 @@ if ($method === 'GET' && preg_match('#^/api/veiculos/([^/]+)$#', $uri, $m)) {
 
 if ($method === 'POST' && $uri === '/api/veiculos') {
     (new VeiculoController())->cadastrar();
+    exit();
+}
+
+if ($method === 'POST' && preg_match('#^/api/agendamentos/?$#', $uri)) {
+    (new AgendamentoController())->abrirOrdemServico();
+    exit();
+}
+
+if ($method === 'GET' && preg_match('#^/api/agendamentos/?$#', $uri)) {
+    (new AgendamentoController())->listarOrdensServico();
+    exit();
+}
+
+if ($method === 'PATCH' && preg_match('#^/api/agendamentos/(\d+)/status/?$#', $uri, $matches)) {
+    (new AgendamentoController())->atualizarStatusOrdemServico((int) $matches[1]);
     exit();
 }
 
