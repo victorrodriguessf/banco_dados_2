@@ -1,5 +1,6 @@
 <?php
 
+use App\Controllers\AgendamentoController;
 use App\Controllers\AuthController;
 use App\Controllers\ClienteController;
 use App\Controllers\VeiculoController;
@@ -17,28 +18,48 @@ if ($method === 'POST' && $uri === '/api/veiculos') {
     exit();
 }
 
-if ($method === 'POST' && $uri === '/auth/login') {
+if ($method === 'POST' && $uri === '/api/auth/login') {
     (new AuthController())->login();
     exit();
 }
 
-if ($method === 'POST' && $uri === '/auth/refresh') {
+if ($method === 'POST' && $uri === '/api/auth/refresh') {
     (new AuthController())->refresh();
     exit();
 }
 
-if ($method === 'POST' && $uri === '/clientes') {
+if ($method === 'POST' && $uri === '/api/clientes') {
     (new ClienteController())->criar();
     exit();
 }
 
-if ($method === 'GET' && preg_match('#^/(?:api/)?clientes$#', $uri)) {
+if ($method === 'GET' && preg_match('#^/api/clientes$#', $uri)) {
     (new ClienteController())->listar();
     exit();
 }
 
-if ($method === 'GET' && preg_match('#^/(?:api/)?clientes/(\d+)$#', $uri, $matches)) {
+if ($method === 'GET' && preg_match('#^/api/clientes/(\d+)$#', $uri, $matches)) {
     (new ClienteController())->buscarPorId((int) $matches[1]);
+    exit();
+}
+
+if ($method === 'POST' && preg_match('#^/api/agendamentos/(\d+)/itens-servico$#', $uri, $m)) {
+    (new AgendamentoController())->adicionarItemServico((int) $m[1]);
+    exit();
+}
+
+if ($method === 'POST' && preg_match('#^/api/agendamentos/(\d+)/itens-peca$#', $uri, $m)) {
+    (new AgendamentoController())->adicionarItemPeca((int) $m[1]);
+    exit();
+}
+
+if ($method === 'POST' && preg_match('#^/api/agendamentos/(\d+)/pagamento$#', $uri, $m)) {
+    (new AgendamentoController())->registrarPagamento((int) $m[1]);
+    exit();
+}
+
+if ($method === 'POST' && preg_match('#^/api/agendamentos/(\d+)/avaliacao$#', $uri, $m)) {
+    (new AgendamentoController())->registrarAvaliacao((int) $m[1]);
     exit();
 }
 
