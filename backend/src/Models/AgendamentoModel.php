@@ -14,6 +14,150 @@ class AgendamentoModel
         $this->pdo = Database::getConnection();
     }
 
+    public function clienteExiste(int $idCliente): bool
+    {
+        $stmt = $this->pdo->prepare('SELECT 1 FROM oficina.cliente WHERE id = :id');
+        $stmt->execute([':id' => $idCliente]);
+
+        return (bool) $stmt->fetchColumn();
+    }
+
+    public function veiculoPertenceAoCliente(int $idVeiculo, int $idCliente): bool
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT 1 FROM oficina.veiculo WHERE id = :id_veiculo AND id_cliente = :id_cliente'
+        );
+        $stmt->execute([
+            ':id_veiculo' => $idVeiculo,
+            ':id_cliente' => $idCliente,
+        ]);
+
+        return (bool) $stmt->fetchColumn();
+    }
+
+    public function tipoServicoExiste(int $idTipoServico): bool
+    {
+        $stmt = $this->pdo->prepare('SELECT 1 FROM oficina.tipo_servico WHERE id = :id');
+        $stmt->execute([':id' => $idTipoServico]);
+
+        return (bool) $stmt->fetchColumn();
+    }
+
+    public function abrirOrdemServico(array $dados): array
+    {
+        $this->pdo->beginTransaction();
+
+        try {
+            $this->pdo->exec('LOCK TABLE oficina.agendamento, oficina.ordem_servico IN EXCLUSIVE MODE');
+
+            $stmtAgendamentoId = $this->pdo->query(
+                'SELECT COALESCE(MAX(id), 0) + 1 AS id FROM oficina.agendamento'
+            );
+            $idAgendamento = (int) $stmtAgendamentoId->fetchColumn();
+
+            $stmtOrdemServicoId = $this->pdo->query(
+                'SELECT COALESCE(MAX(id), 0) + 1 AS id FROM oficina.ordem_servico'
+            );
+            $idOrdemServico = (int) $stmtOrdemServicoId->fetchColumn();
+
+            $stmtAgendamento = $this->pdo->prepare("
+                INSERT INTO oficina.agendamento (
+                    id,
+                    id_cliente,
+                    id_veiculo,
+                    id_tipo_servico,
+                    dt_hora_agendamento
+                )
+                VALUES (
+                    :id,
+                    :id_cliente,
+                    :id_veiculo,
+                    :id_tipo_servico,
+                    :dt_hora_agendamento
+                )
+                RETURNING id, id_cliente, id_veiculo, id_tipo_servico, dt_hora_agendamento
+            ");
+            $stmtAgendamento->execute([
+                ':id' => $idAgendamento,
+                ':id_cliente' => $dados['id_cliente'],
+                ':id_veiculo' => $dados['id_veiculo'],
+                ':id_tipo_servico' => $dados['id_tipo_servico'],
+                ':dt_hora_agendamento' => $dados['dt_hora_agendamento'],
+            ]);
+            $agendamento = $stmtAgendamento->fetch(PDO::FETCH_ASSOC);
+
+            $stmtOrdemServico = $this->pdo->prepare("
+                INSERT INTO oficina.ordem_servico (
+                    id,
+                    id_cliente,
+                    hodometro_inicial,
+                    hodometro_final,
+                    id_agendamento
+                )
+                VALUES (
+                    :id,
+                    :id_cliente,
+                    :hodometro_inicial,
+                    :hodometro_final,
+                    :id_agendamento
+                )
+                RETURNING id, id_cliente, hodometro_inicial, hodometro_final, id_agendamento
+            ");
+            $stmtOrdemServico->execute([
+                ':id' => $idOrdemServico,
+                ':id_cliente' => $dados['id_cliente'],
+                ':hodometro_inicial' => $dados['hodometro_inicial'],
+                ':hodometro_final' => $dados['hodometro_final'],
+                ':id_agendamento' => $idAgendamento,
+            ]);
+            $ordemServico = $stmtOrdemServico->fetch(PDO::FETCH_ASSOC);
+
+            $this->pdo->commit();
+
+            return [
+                'agendamento' => $agendamento,
+                'ordem_servico' => $ordemServico,
+            ];
+        } catch (\Throwable $e) {
+            $this->pdo->rollBack();
+            throw $e;
+        }
+    }
+
+    public function buscarOrdemServicoPorAgendamento(int $idAgendamento): array|false
+    {
+        $stmt = $this->pdo->prepare("
+            SELECT
+                id,
+                id_cliente,
+                hodometro_inicial,
+                hodometro_final,
+                status,
+                id_agendamento
+            FROM oficina.ordem_servico
+            WHERE id_agendamento = :id_agendamento
+        ");
+        $stmt->execute([':id_agendamento' => $idAgendamento]);
+
+        return $stmt->fetch(PDO::FETCH_ASSOC);
+    }
+
+    public function atualizarStatusOrdemServico(int $idAgendamento, string $status): array|false
+    {
+        $stmt = $this->pdo->prepare("
+            UPDATE oficina.ordem_servico
+            SET status = :status
+            WHERE id_agendamento = :id_agendamento
+            RETURNING id, id_cliente, hodometro_inicial, hodometro_final, status, id_agendamento
+        ");
+        $stmt->execute([
+            ':id_agendamento' => $idAgendamento,
+            ':status' => $status,
+        ]);
+
+        return $stmt->fetch(PDO::FETCH_ASSOC);
+    }
+
     public function agendamentoExiste(int $id): bool
     {
         $stmt = $this->pdo->prepare('SELECT 1 FROM oficina.agendamento WHERE id = :id');
@@ -35,13 +179,6 @@ class AgendamentoModel
     {
         $stmt = $this->pdo->prepare('SELECT 1 FROM oficina.pagamento WHERE id_os = :id_os');
         $stmt->execute([':id_os' => $idOs]);
-        return (bool) $stmt->fetchColumn();
-    }
-
-    public function tipoServicoExiste(int $id): bool
-    {
-        $stmt = $this->pdo->prepare('SELECT 1 FROM oficina.tipo_servico WHERE id = :id');
-        $stmt->execute([':id' => $id]);
         return (bool) $stmt->fetchColumn();
     }
 
@@ -179,5 +316,35 @@ class AgendamentoModel
         ]);
 
         return $stmt->fetch(PDO::FETCH_ASSOC);
+    }
+
+    public function listarAgendamentosDoCliente(int $idCliente): array
+    {
+        $sql = "
+            SELECT
+                a.id,
+                a.id_cliente,
+                a.id_veiculo,
+                a.id_tipo_servico,
+                a.dt_hora_agendamento,
+                v.marca,
+                v.modelo,
+                v.placa,
+                ts.descricao as tipo_servico_descricao,
+                os.id as ordem_servico_id,
+                os.hodometro_inicial,
+                os.hodometro_final
+            FROM oficina.agendamento a
+            LEFT JOIN oficina.veiculo v ON a.id_veiculo = v.id
+            LEFT JOIN oficina.tipo_servico ts ON a.id_tipo_servico = ts.id
+            LEFT JOIN oficina.ordem_servico os ON a.id = os.id_agendamento
+            WHERE a.id_cliente = :id_cliente
+            ORDER BY a.dt_hora_agendamento DESC
+        ";
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([':id_cliente' => $idCliente]);
+
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 }

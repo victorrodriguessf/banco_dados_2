@@ -310,7 +310,7 @@ async function getToken() {
     if (token && !tokenExpirado(token)) return token;
 
     try {
-        const r = await fetch(API_BASE + '/api/auth/refresh', { method: 'POST', credentials: 'include' });
+        const r = await fetch(API_BASE + '/auth/refresh', { method: 'POST', credentials: 'include' });
         if (!r.ok) throw new Error();
         const d = await r.json();
         sessionStorage.setItem('access_token', d.access_token);
@@ -354,7 +354,7 @@ document.getElementById('btnBuscarVeiculo').addEventListener('click', async func
 
     try {
         const token = await getToken();
-        const r = await fetch(API_BASE + '/api/veiculos/' + encodeURIComponent(placa), {
+        const r = await fetch(API_BASE + '/veiculos/' + encodeURIComponent(placa), {
             headers: { 'Authorization': 'Bearer ' + token },
             credentials: 'include',
         });
@@ -422,7 +422,7 @@ document.getElementById('btnListarClientes').addEventListener('click', async fun
         if (nome) params.set('nome', nome);
         if (tipo) params.set('tipo', tipo);
 
-        const r = await fetch(API_BASE + '/api/clientes?' + params.toString(), {
+        const r = await fetch(API_BASE + '/clientes?' + params.toString(), {
             headers: { 'Authorization': 'Bearer ' + token },
             credentials: 'include',
         });
@@ -534,7 +534,7 @@ async function enviarOS(acao, camposGetters) {
 
     try {
         const token = await getToken();
-        const r = await fetch(`${API_BASE}/api/agendamentos/${id}/${acao}`, {
+        const r = await fetch(`${API_BASE}/agendamentos/${id}/${acao}`, {
             method: 'POST',
             headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
             credentials: 'include',

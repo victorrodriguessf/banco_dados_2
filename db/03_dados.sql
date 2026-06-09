@@ -222,6 +222,7 @@ INSERT INTO oficina.ordem_servico (
     id_cliente,
     hodometro_inicial,
     hodometro_final,
+    status,
     id_agendamento
 )
 SELECT
@@ -229,6 +230,7 @@ SELECT
     ((gs - 1) % 200) + 1,
     10000 + (gs * 12),
     10000 + (gs * 12) + 35,
+    'concluida',
     ((gs - 1) % 20) + 1
 FROM generate_series(1, 3000) gs;
 

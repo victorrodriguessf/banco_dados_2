@@ -18,6 +18,8 @@ class ClienteController
     {
         header('Content-Type: application/json; charset=utf-8');
 
+        $this->autenticar();
+
         $dados = $this->obterDadosRequisicao();
 
         $nomeCompleto = trim($dados['nome_completo'] ?? '');
@@ -67,6 +69,8 @@ class ClienteController
     {
         header('Content-Type: application/json; charset=utf-8');
 
+        $this->autenticar();
+
         if ($id <= 0) {
             $this->responderErro(400, 'ID do cliente invalido.');
         }
@@ -88,6 +92,8 @@ class ClienteController
     public function listar(): void
     {
         header('Content-Type: application/json; charset=utf-8');
+
+        $this->autenticar();
 
         $nome = $this->normalizarTextoOpcional($_GET['nome'] ?? null);
         $tipo = $this->normalizarTipoPessoa($_GET['tipo'] ?? null);
@@ -116,6 +122,48 @@ class ClienteController
         $json = json_decode(file_get_contents('php://input'), true);
 
         return is_array($json) ? $json : [];
+    }
+
+    private function autenticar(): void
+    {
+        $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+
+        if ($authHeader === '' && function_exists('getallheaders')) {
+            $headers = array_change_key_case(getallheaders(), CASE_LOWER);
+            $authHeader = $headers['authorization'] ?? '';
+        }
+
+        if (!str_starts_with($authHeader, 'Bearer ')) {
+            $this->responderErro(401, 'Token de acesso nao informado.');
+        }
+
+        $token = substr($authHeader, 7);
+        $partes = explode('.', $token);
+
+        if (count($partes) !== 3) {
+            $this->responderErro(401, 'Token invalido.');
+        }
+
+        [$base64Header, $base64Payload, $base64Assinatura] = $partes;
+
+        $assinaturaEsperada = $this->base64UrlEncode(
+            hash_hmac('sha256', "$base64Header.$base64Payload", $_ENV['JWT_SECRET'] ?? 'dev-secret-change-me', true)
+        );
+
+        if (!hash_equals($assinaturaEsperada, $base64Assinatura)) {
+            $this->responderErro(401, 'Token invalido.');
+        }
+
+        $payload = json_decode(base64_decode(strtr($base64Payload, '-_', '+/')), true);
+
+        if (!is_array($payload) || ($payload['exp'] ?? 0) < time()) {
+            $this->responderErro(401, 'Token expirado.');
+        }
+    }
+
+    private function base64UrlEncode(string $dados): string
+    {
+        return rtrim(strtr(base64_encode($dados), '+/', '-_'), '=');
     }
 
     private function normalizarTextoOpcional(?string $valor): ?string

@@ -143,7 +143,7 @@ document.getElementById('loginForm').addEventListener('submit', async function (
     setCarregando(true);
 
     try {
-        const resp = await fetch(API_BASE + '/api/auth/login', {
+        const resp = await fetch(API_BASE + '/auth/login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',

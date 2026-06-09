@@ -85,7 +85,7 @@
                 </svg>
                 Meus Agendamentos
             </div>
-            <div class="empty-state">
+            <div id="agendamentosList" class="empty-state">
                 <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none"
                      stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
                     <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
@@ -93,8 +93,51 @@
                     <line x1="8" y1="2" x2="8" y2="6"/>
                     <line x1="3" y1="10" x2="21" y2="10"/>
                 </svg>
-                <p>Histórico de agendamentos em breve.</p>
+                <p>Carregando seus agendamentos...</p>
             </div>
+        </div>
+
+        <!-- Adicionar agendamento -->
+        <div class="card">
+            <div class="card-title">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                     stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 10h-3V7a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v3H3"/>
+                    <path d="M16 21h5V11H16"/>
+                    <path d="M3 10h5v11H3z"/>
+                </svg>
+                Adicionar Agendamento
+            </div>
+
+            <div id="alertAgendamento" class="alert alert-danger hidden">
+                <span id="alertAgendamentoMsg"></span>
+            </div>
+            <div id="alertAgendamentoOk" class="alert alert-success hidden">
+                <span id="alertAgendamentoOkMsg"></span>
+            </div>
+
+            <div class="form-group">
+                <label for="agendamentoVeiculo">Veículo</label>
+                <select id="agendamentoVeiculo">
+                    <option value="">Selecione um veículo</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="agendamentoTipoServico">ID do Tipo de Serviço</label>
+                <input type="number" id="agendamentoTipoServico" placeholder="Ex.: 1" min="1">
+            </div>
+            <div class="form-group">
+                <label for="agendamentoDataHora">Data e hora do atendimento</label>
+                <input type="datetime-local" id="agendamentoDataHora">
+            </div>
+            <div class="form-group">
+                <label for="agendamentoHodometro">Hodômetro inicial</label>
+                <input type="number" id="agendamentoHodometro" placeholder="Ex.: 12345" min="0">
+            </div>
+            <p style="font-size:.86rem;color:var(--text-muted);margin-bottom:1rem;">
+                Informe o ID do tipo de serviço desejado. Se não souber o ID, peça ao atendimento.
+            </p>
+            <button class="btn btn-primary btn-full" id="btnAdicionarAgendamento">Agendar</button>
         </div>
 
         <!-- Meus veículos -->
@@ -177,12 +220,27 @@ function tokenExpirado(token) {
     } catch { return true; }
 }
 
+function parseJwt(token) {
+    try {
+        const payload = token.split('.')[1];
+        return JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')));
+    } catch {
+        return null;
+    }
+}
+
+function obterIdClienteDoToken(token) {
+    const payload = parseJwt(token);
+    const sub = payload?.sub;
+    return sub ? parseInt(sub, 10) : null;
+}
+
 async function getToken() {
     let token = sessionStorage.getItem('access_token');
     if (token && !tokenExpirado(token)) return token;
 
     try {
-        const r = await fetch(API_BASE + '/api/auth/refresh', { method: 'POST', credentials: 'include' });
+        const r = await fetch(API_BASE + '/auth/refresh', { method: 'POST', credentials: 'include' });
         if (!r.ok) throw new Error();
         const d = await r.json();
         sessionStorage.setItem('access_token', d.access_token);
@@ -192,6 +250,88 @@ async function getToken() {
         window.location.href = 'login.php';
         return null;
     }
+}
+
+async function carregarCliente() {
+    const token = await getToken();
+    if (!token) return null;
+
+    const clienteId = obterIdClienteDoToken(token);
+    if (!clienteId) return null;
+
+    try {
+        const response = await fetch(`${API_BASE}/clientes/${clienteId}`, {
+            headers: { 'Authorization': 'Bearer ' + token },
+            credentials: 'include',
+        });
+
+        if (!response.ok) return null;
+        return await response.json();
+    } catch {
+        return null;
+    }
+}
+
+function atualizarCarregamentoAgendamentos(html) {
+    const container = document.getElementById('agendamentosList');
+    container.classList.remove('empty-state');
+    container.innerHTML = html;
+}
+
+async function listarAgendamentos() {
+    const token = await getToken();
+    if (!token) return;
+
+    try {
+        const response = await fetch(`${API_BASE}/agendamentos`, {
+            headers: { 'Authorization': 'Bearer ' + token },
+            credentials: 'include',
+        });
+
+        if (!response.ok) {
+            throw new Error();
+        }
+
+        const data = await response.json();
+        const agendamentos = Array.isArray(data.agendamentos) ? data.agendamentos : [];
+
+        if (agendamentos.length === 0) {
+            atualizarCarregamentoAgendamentos('<p style="font-size:.875rem;color:var(--text-muted)">Nenhum agendamento registrado.</p>');
+            return;
+        }
+
+        const html = agendamentos.map(a => `
+            <div class="agendamento-item">
+                <strong>Agendamento #${a.id}</strong>
+                <span>${a.dt_hora_agendamento ? new Date(a.dt_hora_agendamento).toLocaleString('pt-BR') : 'Data indisponível'}</span>
+                <span>Veículo: ${a.marca || '—'} ${a.modelo || '—'} (${a.placa || '—'})</span>
+                <span>Serviço: ${a.tipo_servico_descricao || '—'}</span>
+            </div>
+        `).join('');
+
+        atualizarCarregamentoAgendamentos(html);
+    } catch {
+        atualizarCarregamentoAgendamentos('<p style="font-size:.875rem;color:var(--text-muted)">Não foi possível carregar os agendamentos.</p>');
+    }
+}
+
+async function carregarVeiculosDoCliente() {
+    const cliente = await carregarCliente();
+    const select = document.getElementById('agendamentoVeiculo');
+
+    select.innerHTML = '<option value="">Selecione um veículo</option>';
+
+    if (!cliente?.veiculos?.length) {
+        select.innerHTML += '<option value="">Nenhum veículo cadastrado</option>';
+        return;
+    }
+
+    cliente.veiculos.forEach(veiculo => {
+        const option = document.createElement('option');
+        option.value = veiculo.id;
+        option.textContent = `${veiculo.marca || 'Sem marca'} ${veiculo.modelo || ''} (${veiculo.placa || 'sem placa'})`;
+        select.appendChild(option);
+    });
 }
 
 (async function () {
@@ -208,7 +348,77 @@ async function getToken() {
     document.getElementById('navUsuario').textContent  = usuario;
     document.getElementById('saudacao').textContent    = 'Olá, ' + usuario + '!';
     document.getElementById('infoUsuario').textContent = usuario;
+
+    await carregarVeiculosDoCliente();
+    await listarAgendamentos();
 })();
+
+/* ---------- Agendamento do cliente ---------- */
+document.getElementById('btnAdicionarAgendamento').addEventListener('click', async function () {
+    const alertErr = document.getElementById('alertAgendamento');
+    const alertOk  = document.getElementById('alertAgendamentoOk');
+
+    alertErr.classList.add('hidden');
+    alertOk.classList.add('hidden');
+
+    const token = await getToken();
+    if (!token) return;
+
+    const clienteId = obterIdClienteDoToken(token);
+    const idVeiculo = parseInt(document.getElementById('agendamentoVeiculo').value, 10) || null;
+    const idTipoServico = parseInt(document.getElementById('agendamentoTipoServico').value, 10) || null;
+    const dtHoraAgendamento = document.getElementById('agendamentoDataHora').value;
+    const hodometroInicial = parseInt(document.getElementById('agendamentoHodometro').value, 10);
+
+    if (!clienteId || !idVeiculo || !idTipoServico || !dtHoraAgendamento || Number.isNaN(hodometroInicial)) {
+        document.getElementById('alertAgendamentoMsg').textContent = 'Preencha todos os campos do agendamento.';
+        alertErr.classList.remove('hidden');
+        return;
+    }
+
+    this.disabled = true;
+    this.textContent = 'Agendando...';
+
+    try {
+        const response = await fetch(`${API_BASE}/agendamentos`, {
+            method: 'POST',
+            headers: {
+                'Authorization': 'Bearer ' + token,
+                'Content-Type': 'application/json',
+            },
+            credentials: 'include',
+            body: JSON.stringify({
+                id_cliente: clienteId,
+                id_veiculo: idVeiculo,
+                id_tipo_servico: idTipoServico,
+                dt_hora_agendamento: dtHoraAgendamento,
+                hodometro_inicial: hodometroInicial,
+            }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            document.getElementById('alertAgendamentoMsg').textContent = data.erro || 'Erro ao criar agendamento.';
+            alertErr.classList.remove('hidden');
+            return;
+        }
+
+        document.getElementById('alertAgendamentoOkMsg').textContent = 'Agendamento criado com sucesso.';
+        alertOk.classList.remove('hidden');
+        document.getElementById('agendamentoTipoServico').value = '';
+        document.getElementById('agendamentoDataHora').value = '';
+        document.getElementById('agendamentoHodometro').value = '';
+        document.getElementById('agendamentoVeiculo').selectedIndex = 0;
+        await listarAgendamentos();
+    } catch {
+        document.getElementById('alertAgendamentoMsg').textContent = 'Não foi possível conectar ao servidor.';
+        alertErr.classList.remove('hidden');
+    } finally {
+        this.disabled = false;
+        this.textContent = 'Agendar';
+    }
+});
 
 /* ---------- Avaliação do cliente ---------- */
 document.getElementById('btnEnviarAvalCliente').addEventListener('click', async function () {
@@ -234,7 +444,7 @@ document.getElementById('btnEnviarAvalCliente').addEventListener('click', async 
 
     try {
         const token = await getToken();
-        const r = await fetch(`${API_BASE}/api/agendamentos/${agendamentoId}/avaliacao`, {
+        const r = await fetch(`${API_BASE}/agendamentos/${agendamentoId}/avaliacao`, {
             method: 'POST',
             headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
             credentials: 'include',
